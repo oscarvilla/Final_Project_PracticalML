@@ -67,11 +67,11 @@ DF <- rbind(as.numeric(inTrain$Fold1, inTrain$Fold2, inTrain$Fold3, inTrain$Fold
 duplicated(DF)
 ## Checking no losses of rows
 nrow(trainingAll) == nrow(training1) + nrow(training2) + nrow(training3) + nrow(training4) + nrow(training5)
-## follow the instructions of lgreski
+## follow the instructions of lgreski aiming to speed up the process
 ## on https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md
 ## Set up training run for x / y syntax because model format performs poorly
-x <- training[, -ncol(training)]
-y <- training[, ncol(training)]
+x <- training1[, -ncol(training1)]
+y <- training1[, ncol(training1)]
 ## Step 1: Configure parallel processing
 library(parallel)
 library(doParallel)
@@ -79,9 +79,9 @@ cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
 registerDoParallel(cluster)
 ## Step 2: Configure trainControl object
 fitControl <- trainControl(method = "cv",
-                           number = 10,
+                           number = 3,
                            allowParallel = TRUE)
 ## Step 3: Develop training model
-mdl1 <- train(x, y, method = "rf", trControl = fitControl, data = trainingClean)
+mdl1 <- train(x, y, method = "rf", trControl = fitControl, data = training1)
 ## Step 4: De-register parallel processing cluster
 stopCluster(cluster)
