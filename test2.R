@@ -1,51 +1,72 @@
-## Downloading data.
+## 1. Downloading data.
 urlTraining <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
 fileTraining <- "pml-training.csv"
 urlTesting <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
 fileTesting <- "pml-testing.csv"
-## Import the data making empty values as NAs.
+## 1.1. Import the data making empty values as NAs.
 training <- read.csv(fileTraining, na.strings=c("NA",""), header=TRUE)
 testing <- read.csv(fileTesting, na.strings=c("NA",""), header=TRUE)
-## Checking identity names except the las colname
+## 1.2. Checking identity names except the las colname
 trainNames <- colnames(training)
 testNames <- colnames(testing)
-## Have the two data sets the same columns
+## 1.3. Have the two data sets the same columns
 all.equal(trainNames[-length(trainNames)], testNames[-length(testNames)])
-## There are a lot of columns filled of NAs. Lets see how much
+## 2. There are a lot of columns filled of NAs. Lets see how much
 numNAsTraining <- apply(training, 2, function(x) sum(is.na(x)))
-as.numeric(numNAsTraining)
+table(as.numeric(numNAsTraining))
 numNAsTesting <- apply(testing, 2, function(x) sum(is.na(x)))
-## All those columns have this proportion of cases as NAs
+## 2.1. All those columns have this proportion of cases as NAs
 max(as.numeric(numNAsTraining)) / nrow(training)
-## Will not try to fill it because of the proportion, and will remove it because they doesn't allow
+## 2.2. Will not try to fill it because of the proportion, and will remove it because they doesn't allow
 ## calculate predictions with the model if included as newdata.
-trainingClean <- training[,(numNAsTraining == 0)]
-testingClean <- testing[,(numNAsTesting == 0)]
-## Let's check the number of NAs
-sum(is.na(trainingClean))
-sum(is.na(testingClean))
-## I'll not take in account the first sevent columns, namely:
-colnames(trainingClean)[1:7]
-## Because they talk about row name, user name, time stamps in differents formats and the windows
+training <- training[,(numNAsTraining == 0)]
+testing <- testing[,(numNAsTesting == 0)]
+## 2.2.1 Let's check the number of NAs
+sum(is.na(training))
+sum(is.na(testing))
+## 2.3. I'll not take in account the first sevent columns, namely:
+colnames(training)[1:7]
+## 2.3.1. Because they talk about row name, user name, time stamps in differents formats and the windows
 ## of observations
-trainingClean <- trainingClean[, 8:ncol(trainingClean)]
-testingClean <- testingClean[, 8:ncol(testingClean)]
-## Checking both data sets have the same columns except the last one (class)
-all.equal(names(trainingClean[,-ncol(trainingClean)]), names(testingClean[,-ncol(testingClean)]))
-## So far we have the test set ready-tidy to apply machine learning
+training <- training[, 8:ncol(training)]
+testing <- testing[, 8:ncol(testing)]
+## 2.3.2. Checking both data sets have the same columns except the last one (class)
+all.equal(names(training[,-ncol(training)]), names(testing[,-ncol(testing)]))
+## 3. So far we have the test set ready-tidy to start applying machine learning
 library(caret)
-## Partitioning the data... 60% - 40%
-inTrain2 <- createDataPartition(y = trainingClean$classe, times = 10, p = 0.60, list = FALSE)
-training <- trainingClean[inTrain, ]
-testing <- trainingClean[-inTrain, ]
+## Partitioning the data... 60% - 20% - 20%%
+set.seed(1981)
+inTrain <- createDataPartition(training$classe, p = 0.60, list = FALSE)
+trainingAll <- training[inTrain, ]
+testingAll <- training[-inTrain, ]
 ## Checking partitioning did well done: it's the sum of the number of cases of the two new data equal
 ## to the number of cases of the original
-nrow(training) + nrow(testing) == nrow(trainingClean)
-## Because of the time that takes to run a random forest, I will to sparse the dataset in chunks aiming
-## to run the random forest on each one and the stacking them together
-
-
-
+nrow(trainingAll) + nrow(testingAll) == nrow(training)
+## Now I gonna split the testingAll dataset into two blocks, one for testing and the another for validation
+set.seed(1982)
+inTrain <- createDataPartition(y = testingAll$classe, p = 0.50, list = FALSE)
+testingTrained <- testingAll[inTrain, ]
+validationtrained <- testingAll[-inTrain, ]
+## Let's check
+nrow(testingTrained) + nrow(validationtrained) == nrow(testingAll)
+## Because of the time that takes to run a random forest on a data set as big as this (I tryed it for 
+## around 30 minutes with parallelizing for allow me to use three of the cores of a 
+## Intel® Core™ i7-6500U CPU @ 2.50GHz × 4 with 8GB of RAM availables, but couldn't see the work ended)
+dim(trainingAll)
+## I will to split the dataset in 5 folds aiming to run the random forest and other models on each one
+## and then stack them together with a random forest again
+inTrain <- createFolds(y = trainingAll$classe, k = 5)
+training1 <- trainingAll[inTrain$Fold1, ]
+training2 <- trainingAll[inTrain$Fold2, ]
+training3 <- trainingAll[inTrain$Fold3, ]
+training4 <- trainingAll[inTrain$Fold4, ]
+training5 <- trainingAll[inTrain$Fold5, ]
+## Checking there are not repeated cases (rows): make a vector with all the elements of the lists (the
+## cases and find out if there are duplicates among them)
+DF <- rbind(as.numeric(inTrain$Fold1, inTrain$Fold2, inTrain$Fold3, inTrain$Fold4, inTrain$Fold5))
+duplicated(DF)
+## Checking no losses of rows
+nrow(trainingAll) == nrow(training1) + nrow(training2) + nrow(training3) + nrow(training4) + nrow(training5)
 ## follow the instructions of lgreski
 ## on https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md
 ## Set up training run for x / y syntax because model format performs poorly
