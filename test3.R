@@ -97,16 +97,45 @@ fitControl <- trainControl(method = "cv",
                            number = 3,
                            allowParallel = TRUE)
 ## Step 3: Develop training model
+set.seed(1984)
 mdl1 <- train(x1, y1, method = "rf", trControl = fitControl, data = training1)
 mdl2 <- train(x2, y2, method = "rf", trControl = fitControl, data = training2)
 mdl3 <- train(x3, y3, method = "rf", trControl = fitControl, data = training3)
 mdl4 <- train(x4, y4, method = "rf", trControl = fitControl, data = training4)
 ## Step 4: De-register parallel processing cluster
 stopCluster(cluster)
-## checking mettrics with confusionMatrix
+rm(list = c("x1", "x2", "x3", "x4", "y1", "y2", "y3", "y4"))
+## checking metrics with confusionMatrix
 pred1 <- predict(mdl1, testingTrained)
 pred2 <- predict(mdl2, testingTrained)
 pred3 <- predict(mdl3, testingTrained)
 pred4 <- predict(mdl4, testingTrained)
-confusionMatrix(pred1, testingTrained$classe)
+acc <- rbind(mdl1 = confusionMatrix(pred1, testingTrained$classe)$overall, 
+             mdl2 = confusionMatrix(pred2, testingTrained$classe)$overall, 
+             mdl3 = confusionMatrix(pred3, testingTrained$classe)$overall, 
+             mdl4 = confusionMatrix(pred4, testingTrained$classe)$overall)
+sens <- rbind(mdl1 = t(confusionMatrix(pred1, testingTrained$classe)$byClass)[1,], 
+                  mdl2 = t(confusionMatrix(pred2, testingTrained$classe)$byClass)[1,], 
+                  mdl3 = t(confusionMatrix(pred3, testingTrained$classe)$byClass)[1,], 
+                  mdl4 = t(confusionMatrix(pred4, testingTrained$classe)$byClass)[1,])
+acc <- rbind(mdl1 = t(confusionMatrix(pred1, testingTrained$classe)$byClass)[2,], 
+              mdl2 = t(confusionMatrix(pred2, testingTrained$classe)$byClass)[2,], 
+              mdl3 = t(confusionMatrix(pred3, testingTrained$classe)$byClass)[2,], 
+              mdl4 = t(confusionMatrix(pred4, testingTrained$classe)$byClass)[2,])
+sensAvg <- colMeans(sens)
+accAvg <- colMeans(acc)
+## Stacking
+myStack <- cbind(pred1, pred2, pred3, pred4, testingTrained$classe)
+## Parallelizing again
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+fitControl <- trainControl(method = "cv",
+                           number = 3,
+                           allowParallel = TRUE)
+x <- myStack[, -ncol(myStack)]
+y <- myStack[, ncol(myStack)]
+mdl <- train(x, y, method = "rf", trControl = fitControl, data = myStack)
+stopCluster(cluster)
 ## The stacking model is on the Q4 q2
