@@ -55,17 +55,22 @@ rm(testingAll)
 ## Because of the time that takes to run a random forest on a data set as big as this (I tryed it for 
 ## around 30 minutes with parallelizing for allow me to use three of the cores of a 
 ## Intel® Core™ i7-6500U CPU @ 2.50GHz × 4 with 8GB of RAM availables, but couldn't see the work ended)
+## rpart as method yields just 0.5073 of accuracy, not enougth
+## lda as method yields just 0.7 of accuracy, not enougth
+## svm as method yields a accuracy of 0.89. It's not so bad
+
 dim(trainingAll)
 ## I will to split the dataset in 5 folds aiming to run the random forest and other models on each one
 ## and then stack them together with a random forest again
 set.seed(1983)
-inTrain <- createFolds(y = trainingAll$classe, k = 3)
+inTrain <- createFolds(y = trainingAll$classe, k = 4)
 training1 <- trainingAll[inTrain$Fold1, ]
 training2 <- trainingAll[inTrain$Fold2, ]
 training3 <- trainingAll[inTrain$Fold3, ]
+training4 <- trainingAll[inTrain$Fold4, ]
 ## Checking there are not repeated cases (rows): make a vector with all the elements of the lists (the
 ## cases and find out if there are duplicates among them)
-DF <- rbind(as.numeric(inTrain$Fold1, inTrain$Fold2, inTrain$Fold3))
+DF <- rbind(as.numeric(inTrain$Fold1, inTrain$Fold2, inTrain$Fold3, inTrain$Fold4))
 duplicated(DF)
 rm(DF)
 ## Checking no losses of rows
@@ -80,7 +85,8 @@ x2 <- training2[, -ncol(training2)]
 y2 <- training2[, ncol(training2)]
 x3 <- training3[, -ncol(training3)]
 y3 <- training3[, ncol(training3)]
-
+x4 <- training4[, -ncol(training4)]
+y4 <- training4[, ncol(training4)]
 ## Step 1: Configure parallel processing
 library(parallel)
 library(doParallel)
@@ -94,10 +100,13 @@ fitControl <- trainControl(method = "cv",
 mdl1 <- train(x1, y1, method = "rf", trControl = fitControl, data = training1)
 mdl2 <- train(x2, y2, method = "rf", trControl = fitControl, data = training2)
 mdl3 <- train(x3, y3, method = "rf", trControl = fitControl, data = training3)
-library(e1071)
-mdl4 <- svm(classe ~ ., data = training4)
+mdl4 <- train(x4, y4, method = "rf", trControl = fitControl, data = training4)
 ## Step 4: De-register parallel processing cluster
 stopCluster(cluster)
 ## checking mettrics with confusionMatrix
-pred1 <- predict(mdl1, )
+pred1 <- predict(mdl1, testingTrained)
+pred2 <- predict(mdl2, testingTrained)
+pred3 <- predict(mdl3, testingTrained)
+pred4 <- predict(mdl4, testingTrained)
+confusionMatrix(pred1, testingTrained$classe)
 ## The stacking model is on the Q4 q2
