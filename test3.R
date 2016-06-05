@@ -6,6 +6,8 @@ fileTesting <- "pml-testing.csv"
 ## 1.1. Import the data making empty values as NAs.
 training <- read.csv(fileTraining, na.strings=c("NA",""), header=TRUE)
 testing <- read.csv(fileTesting, na.strings=c("NA",""), header=TRUE)
+## Cleaning
+rm(list = c("urlTesting", "urlTraining"))
 ## 1.2. Checking identity names except the las colname
 trainNames <- colnames(training)
 testNames <- colnames(testing)
@@ -24,6 +26,8 @@ testing <- testing[,(numNAsTesting == 0)]
 ## 2.2.1 Let's check the number of NAs
 sum(is.na(training))
 sum(is.na(testing))
+## Cleaning
+rm(list = c("numNAsTesting", "numNAsTraining", "testNames", "trainNames"))
 ## 2.3. I'll not take in account the first sevent columns, namely:
 colnames(training)[1:7]
 ## 2.3.1. Because they talk about row name, user name, time stamps in differents formats and the windows
@@ -74,7 +78,7 @@ DF <- rbind(as.numeric(inTrain$Fold1, inTrain$Fold2, inTrain$Fold3, inTrain$Fold
 duplicated(DF)
 rm(DF)
 ## Checking no losses of rows
-nrow(trainingAll) == nrow(training1) + nrow(training2) + nrow(training3) 
+nrow(trainingAll) == nrow(training1) + nrow(training2) + nrow(training3) + nrow(training4)
 rm(trainingAll)
 ## follow the instructions of lgreski aiming to speed up the process
 ## on https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md
@@ -122,10 +126,18 @@ acc <- rbind(mdl1 = t(confusionMatrix(pred1, testingTrained$classe)$byClass)[2,]
               mdl2 = t(confusionMatrix(pred2, testingTrained$classe)$byClass)[2,], 
               mdl3 = t(confusionMatrix(pred3, testingTrained$classe)$byClass)[2,], 
               mdl4 = t(confusionMatrix(pred4, testingTrained$classe)$byClass)[2,])
-sensAvg <- colMeans(sens)
-accAvg <- colMeans(acc)
+sensAvg <- t(data.frame(allMdlsAvg = colMeans(sens)))
+accAvg <- t(data.frame(allModelsAvg = colMeans(acc)))
 ## Stacking
-myStack <- cbind(pred1, pred2, pred3, pred4, testingTrained$classe)
+myStack <- data.frame(mdl1 = pred1, 
+                      mdl2 = pred2, 
+                      mdl3 = pred3, 
+                      mdl4 = pred4, 
+                      response = testingTrained$classe)
+## Cleaning 
+rm(list = c("training1", "training2", "training3", "training4"))
+rm(list = c("mdl1", "mdl2", "mdl3", "mdl4"))
+rm(list = c("pred1", "pred2", "pred3", "pred4"))
 ## Parallelizing again
 library(parallel)
 library(doParallel)
@@ -138,4 +150,32 @@ x <- myStack[, -ncol(myStack)]
 y <- myStack[, ncol(myStack)]
 mdl <- train(x, y, method = "rf", trControl = fitControl, data = myStack)
 stopCluster(cluster)
-## The stacking model is on the Q4 q2
+## Measuring accuracy
+pred <- predict(mdl, myStack)
+ppalMetrics <- t(confusionMatrix(pred, myStack$response)$byClass)[1:2,]
+## Comparing accuracies
+ppalMetrics; sensAvg; accAvg
+performance <- data.frame(accGain = ppalMetrics[1, ] - sensAvg, 
+                          sensGain = ppalMetrics[2, ] - accAvg)
+performance
+## Cleaning
+rm(list = c("accAvg", "sensAvg", "performance", "sens", "acc", "ppalMetrics", "x", "y"))
+## Testing on independent test set: validationtrained
+## We can see that even the stacking doesn't increase the perform significantly. So, we can just
+## create a model based on random forest with a dataset of the same number of cases and expect to
+## give back a similar metrics, namely: accuracy and sensitivity
+cluster <- makeCluster(detectCores() - 1)
+registerDoParallel(cluster)
+fitControl <- trainControl(method = "cv",
+                           number = 3,
+                           allowParallel = TRUE)
+x <- validationtrained[, -ncol(validationtrained)]
+y <- validationtrained[, ncol(validationtrained)]
+mdlFinal <- train(x, y, method = "rf", trControl = fitControl, data = validationtrained)
+stopCluster(cluster)
+predFinal <- predict(mdlFinal, validationtrained)
+confusionMatrix(predFinal, validationtrained$classe)
+## The perfomance is awesome 100% in all the five classes
+## So, let's predict with the model on the quiz set, namely: in this case testing
+quizResponse <- predQuiz <- predict(mdlFinal, testing)
+## I got 20/20: Perfect
