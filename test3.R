@@ -164,6 +164,9 @@ rm(list = c("accAvg", "sensAvg", "performance", "sens", "acc", "ppalMetrics", "x
 ## We can see that even the stacking doesn't increase the perform significantly. So, we can just
 ## create a model based on random forest with a dataset of the same number of cases and expect to
 ## give back a similar metrics, namely: accuracy and sensitivity
+## I made the model training it on the validation set. It could be on whatever of the 4 folds
+## previously generated, but the dataset with better metrics was the validation one, so that
+## I choose to train the model over this one.
 cluster <- makeCluster(detectCores() - 1)
 registerDoParallel(cluster)
 fitControl <- trainControl(method = "cv",
