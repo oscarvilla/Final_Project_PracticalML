@@ -42,6 +42,7 @@ testingAll <- training[-inTrain, ]
 ## Checking partitioning did well done: it's the sum of the number of cases of the two new data equal
 ## to the number of cases of the original
 nrow(trainingAll) + nrow(testingAll) == nrow(training)
+rm(training)
 ## Now I gonna split the testingAll dataset into two blocks, one for testing and the another for validation
 set.seed(1982)
 inTrain <- createDataPartition(y = testingAll$classe, p = 0.50, list = FALSE)
@@ -49,6 +50,7 @@ testingTrained <- testingAll[inTrain, ]
 validationtrained <- testingAll[-inTrain, ]
 ## Let's check
 nrow(testingTrained) + nrow(validationtrained) == nrow(testingAll)
+rm(testingAll)
 ## Because of the time that takes to run a random forest on a data set as big as this (I tryed it for 
 ## around 30 minutes with parallelizing for allow me to use three of the cores of a 
 ## Intel® Core™ i7-6500U CPU @ 2.50GHz × 4 with 8GB of RAM availables, but couldn't see the work ended)
@@ -67,11 +69,17 @@ DF <- rbind(as.numeric(inTrain$Fold1, inTrain$Fold2, inTrain$Fold3, inTrain$Fold
 duplicated(DF)
 ## Checking no losses of rows
 nrow(trainingAll) == nrow(training1) + nrow(training2) + nrow(training3) + nrow(training4) + nrow(training5)
+rm(trainingAll)
 ## follow the instructions of lgreski aiming to speed up the process
 ## on https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md
 ## Set up training run for x / y syntax because model format performs poorly
-x <- training1[, -ncol(training1)]
-y <- training1[, ncol(training1)]
+x1 <- training1[, -ncol(training1)]
+y1 <- training1[, ncol(training1)]
+x2 <- training2[, -ncol(training2)]
+y2 <- training2[, ncol(training2)]
+x3 <- training3[, -ncol(training3)]
+y3 <- training3[, ncol(training3)]
+
 ## Step 1: Configure parallel processing
 library(parallel)
 library(doParallel)
@@ -82,6 +90,11 @@ fitControl <- trainControl(method = "cv",
                            number = 3,
                            allowParallel = TRUE)
 ## Step 3: Develop training model
-mdl1 <- train(x, y, method = "rf", trControl = fitControl, data = training1)
+mdl1 <- train(x1, y1, method = "rf", trControl = fitControl, data = training1)
+mdl2 <- train(x2, y2, method = "rf", trControl = fitControl, data = training2)
+mdl3 <- train(x3, y3, method = "rf", trControl = fitControl, data = training3)
+library(e1071)
+mdl4 <- svm(classe ~ ., data = training4)
 ## Step 4: De-register parallel processing cluster
 stopCluster(cluster)
+## The stacking model is on the Q4 q2
